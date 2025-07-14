@@ -1,0 +1,437 @@
+
+name: Flutter Build Ultra-Robusto SDK 35
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: "App Name"
+        required: true
+        type: string
+      package_name:
+        description: "Package Name"
+        required: true
+        type: string
+      app_url:
+        description: "Website URL"
+        required: true
+        type: string
+      version:
+        description: "App Version"
+        required: false
+        default: "1.0.0"
+        type: string
+      ai_enabled:
+        description: "Enable AI Chatbot"
+        required: false
+        default: "false"
+        type: string
+      ai_provider:
+        description: "AI Provider"
+        required: false
+        default: "gemini"
+        type: string
+      ai_model:
+        description: "AI Model"
+        required: false
+        default: "gemini-1.5-flash"
+        type: string
+      ai_api_key:
+        description: "AI API Key"
+        required: false
+        default: ""
+        type: string
+      ai_system_prompt:
+        description: "AI System Prompt"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      FLUTTER_VERSION: 3.24.0
+      JAVA_VERSION: 17
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: "temurin"
+        java-version: ${{ env.JAVA_VERSION }}
+        
+    - name: Verify Java Installation
+      run: |
+        java -version
+        javac -version
+        echo "JAVA_HOME: $JAVA_HOME"
+        
+    - name: Cache Flutter SDK
+      uses: actions/cache@v4
+      with:
+        path: /opt/hostedtoolcache/flutter
+        key: flutter-${{ env.FLUTTER_VERSION }}-${{ runner.os }}
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        cache: true
+        
+    - name: Verify Flutter Installation
+      run: |
+        flutter --version
+        flutter doctor -v
+        
+    # MÉTODO ULTRA-ROBUSTO PARA ANDROID SDK 35
+    - name: Preparar directorio Android SDK
+      run: |
+        echo "🔧 Creando estructura de directorios para Android SDK..."
+        sudo mkdir -p $ANDROID_SDK_ROOT
+        sudo chown -R $USER:$USER $ANDROID_SDK_ROOT
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        
+    - name: Instalar Command Line Tools con método robusto
+      run: |
+        echo "📦 Descargando Android Command Line Tools con verificación multi-capa..."
+        
+        # URLs alternativos para máxima confiabilidad
+        CMDTOOLS_URL_PRIMARY="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+        CMDTOOLS_URL_MIRROR="https://dl-ssl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+        
+        # Función de descarga con reintentos
+        download_with_retry() {
+          local url=$1
+          local output=$2
+          local max_attempts=3
+          
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Intento $attempt de $max_attempts para $url"
+            if curl -L --retry 3 --retry-delay 5 -o "$output" "$url"; then
+              if [ -f "$output" ] && [ $(stat -c%s "$output") -gt 100000000 ]; then
+                echo "✅ Descarga exitosa desde $url"
+                return 0
+              fi
+            fi
+            echo "❌ Fallo en intento $attempt"
+            rm -f "$output"
+            sleep 10
+          done
+          return 1
+        }
+        
+        # Descargar con URLs de respaldo
+        if ! download_with_retry "$CMDTOOLS_URL_PRIMARY" "cmdtools.zip"; then
+          echo "🔄 Probando URL mirror..."
+          if ! download_with_retry "$CMDTOOLS_URL_MIRROR" "cmdtools.zip"; then
+            echo "❌ Error: No se pudo descargar command line tools"
+            exit 1
+          fi
+        fi
+        
+        # Verificar integridad del archivo
+        echo "🔍 Verificando integridad del archivo descargado..."
+        if ! unzip -t cmdtools.zip > /dev/null 2>&1; then
+          echo "❌ Error: Archivo ZIP corrupto"
+          exit 1
+        fi
+        
+        # Extraer con verificación
+        echo "📂 Extrayendo command line tools..."
+        unzip -q cmdtools.zip
+        rm cmdtools.zip
+        
+        # Crear estructura correcta
+        mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+        mv cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
+        
+        # Verificar estructura
+        if [ ! -f "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+          echo "❌ Error: sdkmanager no encontrado después de la extracción"
+          exit 1
+        fi
+        
+        echo "✅ Command line tools instalados correctamente"
+        
+    - name: Configurar variables de entorno Android
+      run: |
+        echo "🔧 Configurando variables de entorno para Android SDK 35..."
+        
+        # Configurar PATH
+        echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+        echo "$ANDROID_SDK_ROOT/build-tools/35.0.0" >> $GITHUB_PATH
+        
+        # Variables de entorno adicionales
+        echo "PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/35.0.0" >> $GITHUB_ENV
+        
+    - name: Instalación Ultra-Robusta de Android SDK 35
+      run: |
+        echo "🚀 Iniciando instalación ultra-robusta de Android SDK 35..."
+        
+        # Función para ejecutar sdkmanager con reintentos
+        run_sdkmanager() {
+          local max_attempts=3
+          local attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Intento $attempt de $max_attempts: $@"
+            
+            if yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "$@"; then
+              echo "✅ Comando exitoso: $@"
+              return 0
+            else
+              echo "❌ Fallo en intento $attempt para: $@"
+              if [ $attempt -eq $max_attempts ]; then
+                echo "💥 Error crítico después de $max_attempts intentos"
+                return 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 15
+            fi
+          done
+        }
+        
+        # Aceptar licencias primero
+        echo "📜 Aceptando licencias de Android SDK..."
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+        # Listar paquetes disponibles para verificar conectividad
+        echo "📋 Verificando conectividad con repositorios..."
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list | head -20
+        
+        # Instalar componentes esenciales con verificación
+        echo "🔧 Instalando platform-tools..."
+        run_sdkmanager "platform-tools"
+        
+        echo "🔧 Instalando build-tools 35.0.0..."
+        run_sdkmanager "build-tools;35.0.0"
+        
+        echo "🔧 Instalando platforms android-35..."
+        run_sdkmanager "platforms;android-35"
+        
+        # Verificación de instalación crítica
+        echo "🔍 Verificando instalación de Android SDK 35..."
+        
+        # Verificar platform-tools
+        if [ ! -f "$ANDROID_SDK_ROOT/platform-tools/adb" ]; then
+          echo "❌ Error: adb no encontrado"
+          exit 1
+        fi
+        
+        # Verificar build-tools
+        if [ ! -f "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt2" ]; then
+          echo "❌ Error: aapt2 no encontrado"
+          exit 1
+        fi
+        
+        # Verificar android.jar (CRÍTICO para evitar corrupción)
+        ANDROID_JAR="$ANDROID_SDK_ROOT/platforms/android-35/android.jar"
+        if [ ! -f "$ANDROID_JAR" ]; then
+          echo "❌ Error: android.jar no encontrado"
+          exit 1
+        fi
+        
+        # Verificación de integridad de android.jar
+        echo "🔍 Verificando integridad de android.jar..."
+        if [ $(stat -c%s "$ANDROID_JAR") -lt 1000000 ]; then
+          echo "❌ Error: android.jar demasiado pequeño (posible corrupción)"
+          exit 1
+        fi
+        
+        # Verificar que android.jar contiene clases Android
+        if ! unzip -l "$ANDROID_JAR" | grep -q "android/app/Activity.class"; then
+          echo "❌ Error: android.jar no contiene clases Android válidas"
+          exit 1
+        fi
+        
+        # Verificar funcionalidad de aapt2 con android.jar
+        echo "🔍 Verificando funcionalidad de aapt2 con android.jar..."
+        if ! $ANDROID_SDK_ROOT/build-tools/35.0.0/aapt2 version > /dev/null 2>&1; then
+          echo "❌ Error: aapt2 no funciona correctamente"
+          exit 1
+        fi
+        
+        echo "✅ Android SDK 35 instalado y verificado correctamente"
+        
+    - name: Configuración avanzada de Gradle para SDK 35
+      run: |
+        echo "⚙️ Configurando Gradle para compatibilidad máxima con Android SDK 35..."
+        
+        # Crear gradle.properties optimizado
+        mkdir -p ~/.gradle
+        cat > ~/.gradle/gradle.properties << "EOF"
+        # Configuración optimizada para Android SDK 35
+        org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseG1GC
+        org.gradle.parallel=true
+        org.gradle.caching=true
+        org.gradle.daemon=true
+        org.gradle.configureondemand=true
+        
+        # Android específico para SDK 35
+        android.useAndroidX=true
+        android.enableJetifier=true
+        android.enableR8.fullMode=true
+        android.enableBuildCache=true
+        
+        # Optimizaciones experimentales para SDK 35
+        android.experimental.enableSourceSetPathsMap=true
+        android.experimental.androidTest.numManagedDeviceShards=1
+        android.experimental.testOptions.managedDevices.setupTimeoutMinutes=20
+        android.experimental.legacyTransform.forceNonIncremental=true
+        
+        # Kotlin optimizations
+        kotlin.incremental=true
+        kotlin.incremental.android=true
+        kotlin.caching.enabled=true
+        kotlin.compiler.execution.strategy=in-process
+        
+        # Memory optimizations
+        org.gradle.workers.max=4
+        kotlin.parallel.tasks.in.project=true
+        
+        # Build optimization
+        android.enableSeparateAnnotationProcessing=true
+        android.enableResourceOptimizations=true
+        android.enableBuildConfig=false
+        android.enableResValues=false
+        
+        # Dex optimizations para SDK 35
+        android.enableDexingArtifactTransform=true
+        android.enableDexingArtifactTransform.desugaring=true
+        EOF
+        
+        echo "✅ Configuración de Gradle completada"
+        
+    - name: Diagnóstico completo del entorno
+      run: |
+        echo "🔍 Ejecutando diagnóstico completo del entorno de desarrollo..."
+        
+        echo "=== Información de Java ==="
+        java -version
+        echo "JAVA_HOME: $JAVA_HOME"
+        
+        echo "=== Información de Flutter ==="
+        flutter --version
+        flutter doctor -v
+        
+        echo "=== Información de Android SDK ==="
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        
+        echo "=== Estructura de directorios Android SDK ==="
+        ls -la $ANDROID_SDK_ROOT/
+        
+        echo "=== Paquetes instalados ==="
+        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed
+        
+        echo "=== Verificación de herramientas ==="
+        echo "adb: $(which adb || echo no encontrado)"
+        echo "aapt2: $(which aapt2 || echo no encontrado)"
+        echo "sdkmanager: $(which sdkmanager || echo no encontrado)"
+        
+        echo "=== Verificación de android.jar ==="
+        ANDROID_JAR="$ANDROID_SDK_ROOT/platforms/android-35/android.jar"
+        if [ -f "$ANDROID_JAR" ]; then
+          echo "Tamaño: $(stat -c%s "$ANDROID_JAR") bytes"
+          echo "Tipo de archivo: $(file "$ANDROID_JAR")"
+          echo "Primeras entradas del JAR:"
+          unzip -l "$ANDROID_JAR" | head -10
+        else
+          echo "❌ android.jar no encontrado"
+        fi
+        
+        echo "✅ Diagnóstico completado"
+
+    - name: Configurar Flutter para Android
+      run: |
+        echo "🔧 Configurando Flutter para usar Android SDK 35..."
+        
+        # Configurar Flutter para usar el SDK instalado
+        flutter config --android-sdk $ANDROID_SDK_ROOT
+        flutter config --no-analytics
+        
+        # Verificar configuración
+        flutter doctor -v
+        
+        # Pre-download de dependencias
+        echo "📦 Pre-descargando dependencias de Flutter..."
+        flutter precache --android
+        
+    - name: Configurar proyecto Flutter
+      run: |
+        echo "📱 Configurando proyecto Flutter con templates optimizados..."
+        
+        # Obtener dependencias
+        flutter pub get
+        
+        # Verificar que podemos resolver dependencias Android
+        echo "🔍 Verificando resolución de dependencias Android..."
+        cd android
+        ./gradlew dependencies --configuration implementation | head -20
+        cd ..
+
+    - name: Build APK Ultra-Robusto
+      run: |
+        echo "🏗️ Iniciando build de APK con Android SDK 35..."
+        
+        # Limpiar antes del build
+        flutter clean
+        flutter pub get
+        
+        # Build con logging detallado
+        echo "🚀 Ejecutando flutter build apk..."
+        flutter build apk --release --verbose
+        
+        # Verificar que el APK se generó correctamente
+        if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+          echo "✅ APK generado exitosamente"
+          ls -la build/app/outputs/flutter-apk/
+          
+          # Información del APK
+          echo "📊 Información del APK:"
+          stat build/app/outputs/flutter-apk/app-release.apk
+        else
+          echo "❌ Error: APK no encontrado"
+          exit 1
+        fi
+
+    - name: Verificación post-build
+      run: |
+        echo "🔍 Ejecutando verificaciones post-build..."
+        
+        # Verificar estructura del APK
+        if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+          echo "=== Estructura del APK ==="
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | head -20
+          
+          echo "=== Tamaño del APK ==="
+          du -h build/app/outputs/flutter-apk/app-release.apk
+        fi
+        
+        echo "✅ Verificación post-build completada"
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk-sdk35-ultra
+        path: build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
+
+    - name: Upload build logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-logs-sdk35-ultra
+        path: |
+          flutter_build.log
+          gradle_build.log
+        retention-days: 7
+        
